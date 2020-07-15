@@ -4,7 +4,7 @@ import TableMain from "./Table/TableMain";
 function App() {
   return (
     <div className="App">
-      <h1>Perx Car Table</h1>
+      <h1>Perx Car's Table</h1>
       <TableMain />
     </div>
   );
