@@ -5,27 +5,32 @@ import TableContainer from "@material-ui/core/TableContainer";
 import Table from "@material-ui/core/Table";
 import TableHeader from "./TableHeader";
 import TableBodyEl from "./TableBodyEl";
-import { updateData } from '../redux/actions';
+import TableFooterEl from "./TableFooterEl";
+import { updateData, getCount } from "../redux/actions";
+import LinearProgress from "@material-ui/core/LinearProgress";
+import { VEHICLES_URL, DEALERS_URL, preperedDealers } from "../CONSTANTS";
 const axios = require("axios");
 
-const VEHICLES_URL = "https://jlrc.dev.perx.ru/carstock/api/v1/vehicles/?";
-const DEALERS_URL = "https://jlrc.dev.perx.ru/carstock/api/v1/dealers/?id__in=";
-const perPage = "per_page=10";
-
-const mapStateToProps = (state) => ({ page: state.tableData.page });
-// const mapDispatchToProps = () => {}
-
-const pulledOffices = (acc, { id, address }) => ({ ...acc, [id]: address });
-
-const preperedDealers = (acc, d) => {
-  const { id, name, offices } = d;
-  const obj = offices.reduce(pulledOffices, {});
-  return { ...acc, [id]: { name, ...obj } };
+const mapStateToProps = (state) => {
+  const { page, data, showTable, perPage } = state.tableData;
+  return {
+    page,
+    data,
+    showTable,
+    perPage,
+  };
 };
 
-const TableMain = ({ page, updateData }) => {
+const TableMain = ({
+  page,
+  perPage,
+  updateData,
+  getCount,
+  data,
+  showTable,
+}) => {
   const getCarsAndDellers = async () => {
-    const url = `${VEHICLES_URL}page=${page}&${perPage}`;
+    const url = `${VEHICLES_URL}page=${page}&per_page=${perPage}`;
     const vehiclesResponse = await axios.get(url, {
       headers: { "X-CS-Dealer-Id-Only": 1 },
     });
@@ -33,18 +38,16 @@ const TableMain = ({ page, updateData }) => {
       data,
       headers: { "x-total-count": count },
     } = vehiclesResponse;
-    console.log(data)
-    const sortedDillers = _.sortedUniq(
+    const uniqDealers = _.uniqBy(
       data.reduce((acc, car) => {
         const { dealer } = car;
         if (dealer) return [...acc, dealer];
         return acc;
       }, [])
     );
-    const dealersIdString = sortedDillers.join(",");
+    const dealersIdString = uniqDealers.join(",");
     const dealersResponse = await axios.get(`${DEALERS_URL}${dealersIdString}`);
     const dealersData = dealersResponse.data.reduce(preperedDealers, {});
-    console.log(dealersResponse)
     const vehiclesData = data.reduce((acc, v) => {
       const { vin, brand, model, grade, dealer: dealerKey, office_ids } = v;
       const [officeID] = office_ids;
@@ -67,28 +70,31 @@ const TableMain = ({ page, updateData }) => {
         },
       ];
     }, []);
-    console.log(vehiclesData)
+    getCount({
+      count: Math.round(count / perPage),
+    });
     updateData({
       data: vehiclesData,
       coll: dealersData,
     });
   };
 
-  // getCarsAndDellers();
+  useEffect(() => {
+    getCarsAndDellers();
+  }, []);
 
-  useEffect(() => {getCarsAndDellers()}, []);
-
+  if (!showTable) return <LinearProgress />;
   return (
     <TableContainer>
       <Table>
         <TableHeader />
-        <TableBodyEl />
+        {data.map((car) => (
+          <TableBodyEl key={_.uniqueId("body_")} car={car} />
+        ))}
+        <TableFooterEl />
       </Table>
     </TableContainer>
   );
 };
 
-export default connect(mapStateToProps, { updateData })(TableMain); 
-
-
- 
+export default connect(mapStateToProps, { updateData, getCount })(TableMain);
